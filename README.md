@@ -2,6 +2,9 @@
 
 Native macOS app for [whisper.cpp](https://github.com/ggerganov/whisper.cpp) (`whisper-cli` from Homebrew).
 
+*   **Current Version: v1.3.0 (SwiftUI)**
+*   **[Release Notes & Version History](file:///Users/dfe/whisper-gui/RELEASE_NOTES.md)**
+
 > **Note:** `/usr/bin/python3` + Tk is broken on many recent macOS versions (instant crash). Use the **native app** below, not `whisper_gui.py`.
 
 ## Requirements
