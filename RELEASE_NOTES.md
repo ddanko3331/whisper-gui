@@ -4,6 +4,18 @@ This document logs the version history, feature additions, and technical specifi
 
 ---
 
+## [v1.3.1] — Microphone Recording & Training Tooltips
+*Released: July 2026*
+
+This update integrates native microphone capture directly into the voice registration workflow and provides educational tooltips on training guidelines.
+
+### Added
+*   **Direct Microphone Recording**: Added a native "Record" button to the **Register Voice** sheet. It requests microphone permissions securely on macOS and records a clean, single-speaker 12-second sample directly to a temporary `.wav` file for instant registration.
+*   **Best Practices Info Popover**: Added a small circled information icon (`info.circle`) next to the "Register Voice…" button in the **Transcribe** tab. Hovering/clicking it opens a popover listing speaker profiling best practices (clean speech, duration target, normal speaking voice).
+*   **Entitlements**: Added `NSMicrophoneUsageDescription` configuration to request microphone access natively.
+
+---
+
 ## [v1.3.0] — SwiftUI Native Migration
 *Released: July 2026*
 

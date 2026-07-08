@@ -51,6 +51,8 @@ cat > "${CONTENTS_DIR}/Info.plist" <<EOF
     <true/>
     <key>NSContactsUsageDescription</key>
     <string>Whisper GUI requests access to your contacts to associate speaker voice signatures with your contact cards.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Whisper GUI requests access to your microphone to record voice samples for training speaker profiles.</string>
 </dict>
 </plist>
 EOF

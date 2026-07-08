@@ -1765,6 +1765,11 @@ struct RegisterVoiceSheet: View {
     @State private var statusMessage: String = ""
     @State private var isRunning: Bool = false
     
+    @State private var isRecording: Bool = false
+    @State private var recordingSecondsRemaining: Int = 12
+    @State private var recorder: AVAudioRecorder?
+    @State private var recordingTimer: Timer?
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Register Voice Profile")
@@ -1782,6 +1787,8 @@ struct RegisterVoiceSheet: View {
                         Text("Audio Sample:")
                             .frame(width: 110, alignment: .leading)
                         TextField("/path/to/sample.wav", text: $audioSamplePath)
+                            .disabled(isRecording)
+                        
                         Button("Browse…") {
                             let panel = NSOpenPanel()
                             panel.title = "Select audio sample"
@@ -1792,6 +1799,21 @@ struct RegisterVoiceSheet: View {
                                 audioSamplePath = url.path
                             }
                         }
+                        .disabled(isRecording)
+                        
+                        Button(action: {
+                            if isRecording {
+                                stopRecording()
+                            } else {
+                                startRecording()
+                            }
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: isRecording ? "stop.fill" : "mic.fill")
+                                    .foregroundColor(isRecording ? .red : .primary)
+                                Text(isRecording ? "Stop (\(recordingSecondsRemaining)s)" : "Record")
+                            }
+                        }
                     }
                 }
             }
@@ -1800,7 +1822,7 @@ struct RegisterVoiceSheet: View {
             if !statusMessage.isEmpty {
                 Text(statusMessage)
                     .font(.caption)
-                    .foregroundColor(statusMessage.hasPrefix("Success") ? .green : .secondary)
+                    .foregroundColor(statusMessage.hasPrefix("Success") ? .green : (statusMessage.hasPrefix("Recording") ? .red : .secondary))
             }
             
             HStack {
@@ -1808,7 +1830,7 @@ struct RegisterVoiceSheet: View {
                 Button("Cancel") {
                     dismiss()
                 }
-                .disabled(isRunning)
+                .disabled(isRunning || isRecording)
                 
                 Button("Extract & Register") {
                     isRunning = true
@@ -1824,15 +1846,82 @@ struct RegisterVoiceSheet: View {
                     }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(speakerLabel.isEmpty || audioSamplePath.isEmpty || isRunning)
+                .disabled(speakerLabel.isEmpty || audioSamplePath.isEmpty || isRunning || isRecording)
             }
             .padding(.top, 8)
         }
         .padding()
-        .frame(width: 450, height: 210)
+        .frame(width: 530, height: 210)
         .onAppear {
             model.requestContactsPermissionAndReload()
         }
+        .onDisappear {
+            stopRecording()
+        }
+    }
+    
+    private func startRecording() {
+        let authStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        if authStatus == .authorized {
+            self.performStartRecording()
+        } else if authStatus == .notDetermined {
+            AVCaptureDevice.requestAccess(for: .audio) { granted in
+                DispatchQueue.main.async {
+                    if granted {
+                        self.performStartRecording()
+                    } else {
+                        self.statusMessage = "Microphone access denied."
+                    }
+                }
+            }
+        } else {
+            self.statusMessage = "Microphone access denied. Enable it in System Settings."
+        }
+    }
+    
+    private func performStartRecording() {
+        let tempDir = NSTemporaryDirectory()
+        let fileURL = URL(fileURLWithPath: tempDir).appendingPathComponent("voice_recording.wav")
+        
+        let settings: [String: Any] = [
+            AVFormatIDKey: Int(kAudioFormatLinearPCM),
+            AVSampleRateKey: 16000.0,
+            AVNumberOfChannelsKey: 1,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsFloatKey: false
+        ]
+        
+        do {
+            let rec = try AVAudioRecorder(url: fileURL, settings: settings)
+            rec.prepareToRecord()
+            rec.record()
+            self.recorder = rec
+            self.audioSamplePath = fileURL.path
+            self.isRecording = true
+            self.recordingSecondsRemaining = 12
+            self.statusMessage = "Recording... Please speak clearly."
+            
+            self.recordingTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+                if self.recordingSecondsRemaining > 1 {
+                    self.recordingSecondsRemaining -= 1
+                } else {
+                    self.stopRecording()
+                }
+            }
+        } catch {
+            statusMessage = "Failed to start recording: \(error.localizedDescription)"
+        }
+    }
+    
+    private func stopRecording() {
+        recordingTimer?.invalidate()
+        recordingTimer = nil
+        
+        recorder?.stop()
+        recorder = nil
+        isRecording = false
+        statusMessage = "Recording stopped. Ready to register."
     }
 }
 
@@ -1918,6 +2007,7 @@ struct TranscribeView: View {
     @State private var isDragging: Bool = false
     @State private var showRegisterVoice: Bool = false
     @State private var showTagPopover: Bool = false
+    @State private var showTrainingInfoPopover: Bool = false
     
     var body: some View {
         VStack(spacing: 12) {
@@ -2056,11 +2146,33 @@ struct TranscribeView: View {
                 
                 Spacer()
                 
-                Button("Register Voice…") {
-                    showRegisterVoice = true
-                }
-                .sheet(isPresented: $showRegisterVoice) {
-                    RegisterVoiceSheet(model: model)
+                HStack(spacing: 6) {
+                    Button("Register Voice…") {
+                        showRegisterVoice = true
+                    }
+                    .sheet(isPresented: $showRegisterVoice) {
+                        RegisterVoiceSheet(model: model)
+                    }
+                    
+                    Button(action: {
+                        showTrainingInfoPopover.toggle()
+                    }) {
+                        Image(systemName: "info.circle")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .popover(isPresented: $showTrainingInfoPopover) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Training Best Practices")
+                                .font(.headline)
+                                .padding(.bottom, 2)
+                            Text("• **Duration**: 10 to 15 seconds of clean speech is ideal.")
+                            Text("• **Clarity**: Single voice only. Avoid noise, music, or overlaps.")
+                            Text("• **Natural Voice**: Speak clearly at a standard conversational volume.")
+                        }
+                        .padding()
+                        .frame(width: 280)
+                    }
                 }
             }
             .padding(.vertical, 4)
