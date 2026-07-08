@@ -26,6 +26,18 @@ cd ~/whisper-gui
 ./whisper-gui-native
 ```
 
+## Troubleshooting Gatekeeper ("App is damaged")
+
+If you download the pre-compiled `.app` bundle from GitHub Releases and see the error **"Whisper GUI.app" is damaged and can't be opened**, this is due to macOS Gatekeeper quarantine. 
+
+To fix this, open Terminal and run:
+
+```bash
+xattr -cr "/path/to/Whisper GUI.app"
+```
+
+*(E.g., `xattr -cr "/Applications/Whisper GUI.app"`)*
+
 ## Terminal fallback (no GUI)
 
 ```bash
